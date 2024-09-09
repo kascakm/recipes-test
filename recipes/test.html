@@ -87,7 +87,12 @@
     <p><strong>Published:</strong> September 6, 2023</p>
     <p><strong>Description:</strong> A simple and delicious recipe for classic chocolate chip cookies.</p>
     
-    <h2>Ingredients</h2>
+    <h2>Ingredients
+        <!-- Button to display ingredients list -->
+        <button id="showIngredientsBtn">Add to Shopping List</button>
+        <!-- Button to clear the local storage -->
+        <button id="clearIngredientsBtn">Clear Ingredients</button>
+    </h2>
     <ul>
         <li>1 cup unsalted butter, melted</li>
         <li>1 cup brown sugar</li>
@@ -115,28 +120,69 @@
     <h2>Nutrition</h2>
     <p><strong>Calories:</strong> 200 | <strong>Fat:</strong> 10g | <strong>Carbs:</strong> 25g | <strong>Protein:</strong> 3g</p>
 
-    <!-- Button to display ingredients list -->
-    <button id="showIngredientsBtn">Show Ingredients</button>
-
     <!-- Ingredients Checklist -->
     <h2>Ingredients Checklist</h2>
     <ul id="ingredientsList" style="display: none;"></ul>
-    
+
     <script>
-        // Function to extract ingredients from JSON-LD
+        // Helper function to convert volume strings to float (e.g. "1 1/2 cups" -> 1.5)
+        function parseVolume(volume) {
+            const fractionRegex = /(\d+)\s*(\d+\/\d+)/;  // Handle cases like "1 1/2"
+            const fractionMatch = volume.match(fractionRegex);
+
+            if (fractionMatch) {
+                const [whole, fraction] = fractionMatch;
+                return parseFloat(whole) + eval(fraction);
+            }
+
+            // Handle simple numbers like "2 cups"
+            return eval(volume.replace(/[^0-9\/\.]/g, ''));  // Remove non-numeric characters
+        }
+
+        // Helper function to split ingredient into volume/count and title
+        function parseIngredient(ingredient) {
+            const regex = /^([\d\s\/\.\-]+(?:\s[\w]+)?)\s+(.*)$/; // Splits the first part (volume/count) from the rest
+            const match = ingredient.match(regex);
+            return match ? { volume: match[1].trim(), title: match[2].trim() } : { volume: '', title: ingredient };
+        }
+
+        // Function to get ingredients from JSON-LD
         function getIngredientsFromJSONLD() {
             const scriptTag = document.querySelector('script[type="application/ld+json"]');
             const jsonLD = JSON.parse(scriptTag.textContent);
             return jsonLD.recipeIngredient || [];
         }
 
-        // Function to display ingredients with checkboxes
-        function displayIngredients() {
-            const ingredients = getIngredientsFromJSONLD();
-            const ingredientsList = document.getElementById('ingredientsList');
-            ingredientsList.innerHTML = ''; // Clear any previous list items
+        // Function to save and merge ingredients to local storage
+        function saveIngredientsToLocalStorage(ingredients) {
+            let existingIngredients = JSON.parse(localStorage.getItem('ingredientsList')) || [];
 
-            ingredients.forEach(ingredient => {
+            ingredients.forEach(newIngredient => {
+                const existingIngredient = existingIngredients.find(ing => ing.title === newIngredient.title);
+
+                if (existingIngredient) {
+                    // If the ingredient already exists, sum the volumes
+                    const newVolume = parseVolume(newIngredient.volume);
+                    const existingVolume = parseVolume(existingIngredient.volume);
+                    existingIngredient.volume = (existingVolume + newVolume) + " " + newIngredient.volume.replace(/[\d\/\.]/g, '').trim();  // Keep the unit from the new ingredient
+                } else {
+                    // Otherwise, add the new ingredient
+                    existingIngredients.push(newIngredient);
+                }
+            });
+
+            localStorage.setItem('ingredientsList', JSON.stringify(existingIngredients));
+        }
+
+        // Function to load combined ingredients from local storage and display them
+        function loadAndDisplayIngredients() {
+            const ingredientsList = document.getElementById('ingredientsList');
+            ingredientsList.innerHTML = ''; // Clear previous content
+
+            const savedIngredients = JSON.parse(localStorage.getItem('ingredientsList')) || [];
+
+            // Loop over stored ingredients and display them with checkboxes
+            savedIngredients.forEach(ingredient => {
                 const listItem = document.createElement('li');
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
@@ -151,16 +197,39 @@
                 });
 
                 listItem.appendChild(checkbox);
-                listItem.appendChild(document.createTextNode(ingredient));
+                listItem.appendChild(document.createTextNode(`${ingredient.volume} ${ingredient.title}`));
                 ingredientsList.appendChild(listItem);
             });
 
-            // Display the ingredients list
+            // Display the list
             ingredientsList.style.display = 'block';
         }
 
+        // Function to clear ingredients from local storage and update the UI
+        function clearIngredients() {
+            localStorage.removeItem('ingredientsList'); // Clear the local storage
+            document.getElementById('ingredientsList').innerHTML = ''; // Clear the displayed list
+            document.getElementById('ingredientsList').style.display = 'none'; // Hide the list
+        }
+
         // Event listener for the button click
-        document.getElementById('showIngredientsBtn').addEventListener('click', displayIngredients);
+        document.getElementById('showIngredientsBtn').addEventListener('click', function() {
+            // Extract ingredients and split them into volume and title
+            const rawIngredients = getIngredientsFromJSONLD();
+            const parsedIngredients = rawIngredients.map(parseIngredient);
+
+            // Save ingredients to local storage
+            saveIngredientsToLocalStorage(parsedIngredients);
+
+            // Load and display the combined list from local storage
+            loadAndDisplayIngredients();
+        });
+
+        // Event listener for the "Clear Ingredients" button
+        document.getElementById('clearIngredientsBtn').addEventListener('click', clearIngredients);
+
+        // Optional: Load ingredients automatically on page load
+        // window.onload = loadAndDisplayIngredients;
     </script>
 </body>
 </html>

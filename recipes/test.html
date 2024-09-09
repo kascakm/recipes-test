@@ -114,5 +114,53 @@
 
     <h2>Nutrition</h2>
     <p><strong>Calories:</strong> 200 | <strong>Fat:</strong> 10g | <strong>Carbs:</strong> 25g | <strong>Protein:</strong> 3g</p>
+
+    <!-- Button to display ingredients list -->
+    <button id="showIngredientsBtn">Show Ingredients</button>
+
+    <!-- Ingredients Checklist -->
+    <h2>Ingredients Checklist</h2>
+    <ul id="ingredientsList" style="display: none;"></ul>
+    
+    <script>
+        // Function to extract ingredients from JSON-LD
+        function getIngredientsFromJSONLD() {
+            const scriptTag = document.querySelector('script[type="application/ld+json"]');
+            const jsonLD = JSON.parse(scriptTag.textContent);
+            return jsonLD.recipeIngredient || [];
+        }
+
+        // Function to display ingredients with checkboxes
+        function displayIngredients() {
+            const ingredients = getIngredientsFromJSONLD();
+            const ingredientsList = document.getElementById('ingredientsList');
+            ingredientsList.innerHTML = ''; // Clear any previous list items
+
+            ingredients.forEach(ingredient => {
+                const listItem = document.createElement('li');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+
+                // Add event listener to strike through text when checkbox is checked
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        listItem.style.textDecoration = 'line-through';
+                    } else {
+                        listItem.style.textDecoration = 'none';
+                    }
+                });
+
+                listItem.appendChild(checkbox);
+                listItem.appendChild(document.createTextNode(ingredient));
+                ingredientsList.appendChild(listItem);
+            });
+
+            // Display the ingredients list
+            ingredientsList.style.display = 'block';
+        }
+
+        // Event listener for the button click
+        document.getElementById('showIngredientsBtn').addEventListener('click', displayIngredients);
+    </script>
 </body>
 </html>
